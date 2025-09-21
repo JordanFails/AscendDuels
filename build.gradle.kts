@@ -47,13 +47,13 @@ dependencies {
     implementation("io.papermc:paperlib:1.0.7")
     compileOnly(files("libs/core.jar"))
     compileOnly(files("libs/fawe.jar"))
-    compileOnly(files("lib/EnchantmentAPI-4.28.jar"))
+    compileOnly(files("libs/EnchantmentAPI-4.28.jar"))
     compileOnly(files("libs/InfusedCommons-1.0-SNAPSHOT.jar"))
     compileOnly(files("libs/InfusedEnchants-1.0-SNAPSHOT.jar"))
     compileOnly(files("libs/worldguard-6.2.jar"))
-    compileOnly(files("lib/WorldEdit.jar"))
+    compileOnly(files("libs/WorldEdit.jar"))
     compileOnly(files("libs/SaberFactions.jar"))
-    compileOnly(files("lib/ProtocolLib.jar"))
+    compileOnly(files("libs/ProtocolLib.jar"))
 
 }
 
