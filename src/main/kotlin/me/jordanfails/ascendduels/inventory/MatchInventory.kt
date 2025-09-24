@@ -3,8 +3,8 @@ package me.jordanfails.ascendduels.inventory
 import com.google.common.collect.Lists
 import com.rit.sucy.service.ERomanNumeral
 import me.jordanfails.ascendduels.match.MatchStatistics
-import net.atlantismc.bukkit.menu.Menu
-import net.atlantismc.bukkit.menu.button.Button
+import net.atlantismc.menus.menu.Menu
+import net.atlantismc.menus.menu.button.Button
 import net.pvpwars.core.util.item.ItemBuilder
 import org.apache.commons.lang.time.DurationFormatUtils
 import org.apache.commons.lang3.text.WordUtils

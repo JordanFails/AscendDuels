@@ -13,19 +13,36 @@ open class JsonInventory(
 
     override fun serialize(): JsonObject {
         return JsonObjectBuilder()
-            .addProperty("contents", SerializationUtil.itemStackArrayToBase64(contents))
-            .addProperty("armorContents", SerializationUtil.itemStackArrayToBase64(armorContents))
+            .addProperty(
+                "contents",
+                SerializationUtil.serializeCollection(contents.toList()) ?: ""
+            )
+            .addProperty(
+                "armorContents",
+                SerializationUtil.serializeCollection(armorContents.toList()) ?: ""
+            )
             .jsonObject
     }
 
-    override fun deserialize(t: JsonObject?) {
-        if (t == null) return
+    override fun deserialize(jsonObject: JsonObject?) {
+        if (jsonObject == null) return
 
-        contents = SerializationUtil.itemStackArrayFromBase64(
-            t.get("contents").asString
-        )
-        armorContents = SerializationUtil.itemStackArrayFromBase64(
-            t.get("armorContents").asString
-        )
+        if (jsonObject.has("contents") && !jsonObject["contents"].isJsonNull) {
+            val deserialized = SerializationUtil.deserializeCollection(jsonObject["contents"].asString)
+            contents = if (deserialized != null) {
+                deserialized.map { it as? ItemStack }.toTypedArray()
+            } else {
+                emptyArray()
+            }
+        }
+
+        if (jsonObject.has("armorContents") && !jsonObject["armorContents"].isJsonNull) {
+            val deserialized = SerializationUtil.deserializeCollection(jsonObject["armorContents"].asString)
+            armorContents = if (deserialized != null) {
+                deserialized.map { it as? ItemStack }.toTypedArray()
+            } else {
+                emptyArray()
+            }
+        }
     }
 }

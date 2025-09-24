@@ -3,7 +3,7 @@ package me.jordanfails.ascendduels.listener
 import com.github.sirblobman.combatlogx.api.event.PlayerPreTagEvent
 import com.github.sirblobman.combatlogx.api.event.PlayerTagEvent
 import me.jordanfails.ascendduels.AscendDuels
-import me.jordanfails.ascendduels.arena.ArenaService
+import me.jordanfails.ascendduels.arena.ArenaHandler
 import me.jordanfails.ascendduels.kit.KitTag
 import me.jordanfails.ascendduels.match.Match
 import me.jordanfails.ascendduels.match.MatchService
@@ -34,7 +34,7 @@ class PlayerListener : Listener {
     fun onJoin(event: PlayerJoinEvent) {
         val player = event.player
         val world = player.world
-        if (AscendDuels.instance.arenaService.isWorld(world)) {
+        if (AscendDuels.instance.arenaHandler.getArenaWorld() == world) {
             val spawn = Core.getInstance().locationFile.spawn
             RunnableBuilder.forPlugin(AscendDuels.instance)
                 .with { player.teleport(spawn) }
@@ -196,7 +196,7 @@ class PlayerListener : Listener {
             match.sendMessage(AscendDuels.prefix("&c${player.displayName} &fhas died!"))
         }
 
-        match.onDeath(player, Match.DeathReason.OTHER)
+        match.onDeath(player, Match.DeathReason.KILLED)
     }
 
     @EventHandler(priority = EventPriority.LOW)
@@ -218,7 +218,7 @@ class PlayerListener : Listener {
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     fun onTeleport(event: PlayerTeleportEvent) {
         val player = event.player
-        val arenaService: ArenaService = AscendDuels.instance.arenaService
+        val arenaService: ArenaHandler = AscendDuels.instance.arenaHandler
         val matchService: MatchService = AscendDuels.instance.matchService
 
         val fromWorld: World = event.from.world

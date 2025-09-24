@@ -63,7 +63,7 @@ object KillcamManager : Listener {
                 victim.isFlying = false
 
                 // Finish death in match system
-                match.onDeath(victim, Match.DeathReason.OTHER)
+                match.onDeath(victim, Match.DeathReason.KILLED)
 
                 // Force respawn (1.8 trick)
                 victim.spigot().respawn()

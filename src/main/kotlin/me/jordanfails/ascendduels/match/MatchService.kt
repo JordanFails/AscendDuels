@@ -4,7 +4,6 @@ import me.jordanfails.ascendduels.AscendDuels
 import me.jordanfails.ascendduels.api.service.Service
 import net.pvpwars.core.util.runnable.RunnableBuilder
 import me.jordanfails.ascendduels.arena.Arena
-import me.jordanfails.ascendduels.arena.GenArena
 import me.jordanfails.ascendduels.kit.Kit
 import me.jordanfails.ascendduels.match.impl.match.player.PlayerMatch
 import me.jordanfails.ascendduels.match.impl.match.player.RiskMatch
@@ -34,8 +33,7 @@ class MatchService : Service {
 
     fun getMatches(): Set<Match<*, *>> = matches
 
-    fun getByPlayer(player: Player): Match<*, *>? =
-        byUuid[player.uniqueId]
+    fun getByPlayer(player: Player): Match<*, *>? = byUuid[player.uniqueId]
 
     fun getByUuid(uuid: UUID): Match<*, *>? =
         byUuid[uuid]
@@ -46,7 +44,6 @@ class MatchService : Service {
             PlayerMatch(
                 requirements.component1(),
                 requirements.component2(),
-                requirements.component3(),
                 playerOne,
                 playerTwo
             )
@@ -59,31 +56,29 @@ class MatchService : Service {
             RiskMatch(
                 requirements.component1(),
                 requirements.component2(),
-                requirements.component3(),
                 playerOne,
                 playerTwo
             )
         )
     }
 
-    fun findRequirements(kit: Kit?): Triple<Kit, Arena, GenArena>? =
+    fun findRequirements(kit: Kit?): Pair<Kit, Arena>? =
         findRequirements(kit, null)
 
-    fun findRequirements(kitParam: Kit?, arenaParam: Arena?): Triple<Kit, Arena, GenArena>? {
+    fun findRequirements(kitParam: Kit?, arenaParam: Arena?): Pair<Kit, Arena>? {
         var kit = kitParam
         var arena = arenaParam
 
         if (kit == null) {
             kit = AscendDuels.instance.kitService.all()
-                .firstOrNull { it.isEnabled } ?: Kit.EMPTY
+                .firstOrNull { it.isEnabled } ?: Kit.DEFAULT
         }
 
         if (arena == null) {
-            arena = AscendDuels.instance.arenaService.getRandom() ?: return null
+            arena = AscendDuels.instance.arenaHandler.allocateUnusedArena { true }.orElse(null) ?: return null
         }
 
-        val genArena: GenArena = arena.unoccupiedGenArena() ?: return null
-        return Triple(kit, arena, genArena)
+        return Pair(kit, arena)
     }
 
     override fun load() {

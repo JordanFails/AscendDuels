@@ -37,7 +37,7 @@ repositories {
 
 dependencies {
     implementation("services.plasma:honey:1.0.0")
-    implementation("net.atlantismc.menu-api:bukkit:1.5")
+    implementation("net.atlantismc.menu-api:bukkit:1.9")
     compileOnly("co.aikar:acf-paper:0.5.1-SNAPSHOT")
     compileOnly("com.lunarclient:apollo-api:1.1.8")
     implementation("org.spigotmc:spigot:1.8.8-R0.1-SNAPSHOT")

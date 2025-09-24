@@ -1,7 +1,7 @@
 package me.jordanfails.ascendduels.inventory
 
-import net.atlantismc.bukkit.menu.Menu
-import net.atlantismc.bukkit.menu.button.Button
+import net.atlantismc.menus.menu.Menu
+import net.atlantismc.menus.menu.button.Button
 import org.bukkit.ChatColor
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack

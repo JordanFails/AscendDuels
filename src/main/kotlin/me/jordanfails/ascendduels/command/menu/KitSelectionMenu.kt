@@ -1,8 +1,8 @@
 package me.jordanfails.ascendduels.command.menu
 
 import me.jordanfails.ascendduels.kit.Kit
-import net.atlantismc.bukkit.menu.Menu
-import net.atlantismc.bukkit.menu.button.Button
+import net.atlantismc.menus.menu.Menu
+import net.atlantismc.menus.menu.button.Button
 import net.pvpwars.core.util.item.ItemBuilder
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack

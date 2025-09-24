@@ -22,7 +22,7 @@ class YamlKitStorage(private val kitService: KitService) : KitStorage {
 
     override fun saveKits() {
         kitService.getMap().forEach { (kitName: String?, kit: Kit?) ->
-            if (kit!!.isComplete) config.getConfig().set("kits.$kitName", kit.serializeToString())
+            if (kit?.isComplete == true) config.getConfig().set("kits.$kitName", kit.serializeToPrettyString())
         }
         config.save()
     }

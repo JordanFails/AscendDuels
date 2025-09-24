@@ -20,7 +20,7 @@ class DuelInventoryCommand : BaseCommand() {
                 return
             }
 
-            player.openInventory(matchInventory.inventory)
+            matchInventory.open(player)
         } catch (ex: Exception) {
             ex.printStackTrace()
             player.sendMessage(AscendDuels.prefix("&cInvalid UUID."))

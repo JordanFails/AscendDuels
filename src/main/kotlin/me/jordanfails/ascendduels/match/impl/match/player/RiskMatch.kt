@@ -12,7 +12,6 @@ import net.pvpwars.core.Core
 import net.pvpwars.core.util.StringUtil
 import net.pvpwars.core.util.runnable.RunnableBuilder
 import me.jordanfails.ascendduels.arena.Arena
-import me.jordanfails.ascendduels.arena.GenArena
 import me.jordanfails.ascendduels.inventory.RiskPostMatchInventory
 import me.jordanfails.ascendduels.kit.Kit
 import mkremins.fanciful.FancyMessage
@@ -31,15 +30,14 @@ import org.bukkit.util.Vector
 class RiskMatch(
     kit: Kit,
     arena: Arena,
-    genArena: GenArena,
     playerOne: Player,
     playerTwo: Player
-) : PlayerMatch(kit, arena, genArena, playerOne, playerTwo) {
+) : PlayerMatch(kit, arena, playerOne, playerTwo) {
 
     private var riskPostMatchInventory: RiskPostMatchInventory? = null
 
     override fun prepare(player: Player, index: Int) {
-        val spawnPoint = arena.getSpawnLocation(genArena, index)
+        val spawnPoint = arena.getSpawnLocation(index)
 
         // Runs async chunk load, then applies setup
         PaperLib.getChunkAtAsync(spawnPoint).thenAccept {
@@ -175,7 +173,7 @@ class RiskMatch(
                         "SKIP_CLEANUP",
                         FixedMetadataValue(AscendDuels.instance, true)
                     )
-                    entitiesToClear?.add(itemEntity)
+                    entitiesToClear.add(itemEntity)
                 }
             }
         }

@@ -10,7 +10,6 @@ import me.jordanfails.ascendduels.api.event.match.impl.MatchStartEvent
 import net.pvpwars.core.util.StringUtil
 import net.pvpwars.core.util.runnable.RunnableBuilder
 import me.jordanfails.ascendduels.arena.Arena
-import me.jordanfails.ascendduels.arena.GenArena
 import me.jordanfails.ascendduels.kit.Kit
 import org.bukkit.Material
 import org.bukkit.Sound
@@ -21,8 +20,7 @@ import kotlin.collections.HashSet
 
 abstract class Match<T, P : MatchParticipant<T>>(
     val kit: Kit,
-    val arena: Arena,
-    val genArena: GenArena
+    val arena: Arena
 ) {
 
     var state: MatchState? = null
@@ -92,7 +90,7 @@ abstract class Match<T, P : MatchParticipant<T>>(
     }
 
     fun start() {
-        genArena.occupied = true
+        arena.inUse = true
         setState(MatchState.STARTING)
         onStart()
         MatchStartEvent(this).call()
@@ -117,7 +115,10 @@ abstract class Match<T, P : MatchParticipant<T>>(
     }
 
     fun setState(state: MatchState) {
-        MatchChangeStateEvent(this, this.state!!, state).call()
+        val previous = this.state
+        if (previous != null) {
+            MatchChangeStateEvent(this, previous, state).call()
+        }
         this.state = state
     }
 

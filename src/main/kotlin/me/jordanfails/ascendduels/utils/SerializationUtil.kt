@@ -9,6 +9,7 @@ import org.yaml.snakeyaml.external.biz.base64Coder.Base64Coder
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.util.*
 
 object SerializationUtil {
     fun itemStackToBase64(itemStack: ItemStack?): String {
@@ -34,147 +35,194 @@ object SerializationUtil {
         }
     }
 
-    /**
-     * A method to serialize an inventory to Base64 string.
-     *
-     *
-     *
-     *
-     *
-     *
-     * Special thanks to Comphenix in the Bukkit forums or also known
-     * as aadnk on GitHub.
-     *
-     * [Original Source](https://gist.github.com/aadnk/8138186)
-     *
-     * @param inventory to serialize
-     * @return Base64 string of the provided inventory
-     * @throws IllegalStateException
-     */
-    @Throws(IllegalStateException::class)
-    fun inventoryToBase64(inventory: Inventory): String {
+    @JvmStatic
+    fun serialize(item: ItemStack?): String? {
         try {
-            val outputStream = ByteArrayOutputStream()
-            val dataOutput = BukkitObjectOutputStream(outputStream)
+            ByteArrayOutputStream().use { io ->
+                BukkitObjectOutputStream(io).use { os ->
+                    os.writeObject(item)
+                    os.flush()
 
-            // Write the size of the inventory
-            dataOutput.writeInt(inventory.size)
-
-            // Save every element in the list
-            for (i in 0..<inventory.size) {
-                dataOutput.writeObject(inventory.getItem(i))
+                    val serializedObject: ByteArray = io.toByteArray()
+                    return Base64.getEncoder().encodeToString(serializedObject)
+                }
             }
-
-            // Serialize that array
-            dataOutput.close()
-            return Base64Coder.encodeLines(outputStream.toByteArray())
-        } catch (e: Exception) {
-            throw IllegalStateException("Unable to save item stacks.", e)
+        } catch (e: IOException) {
+            e.printStackTrace()
+            return null
         }
     }
 
-    /**
-     * A method to get an [Inventory] from an encoded, Base64, string.
-     *
-     *
-     *
-     *
-     *
-     *
-     * Special thanks to Comphenix in the Bukkit forums or also known
-     * as aadnk on GitHub.
-     *
-     * [Original Source](https://gist.github.com/aadnk/8138186)
-     *
-     * @param data Base64 string of data containing an inventory.
-     * @return Inventory created from the Base64 string.
-     * @throws IOException
-     */
-    @Throws(IOException::class)
-    fun inventoryFromBase64(data: String): Inventory {
+    @JvmStatic
+    fun deserialize(serialized: String?): ItemStack? {
         try {
-            val inputStream = ByteArrayInputStream(Base64Coder.decodeLines(data))
-            val dataInput = BukkitObjectInputStream(inputStream)
-            val inventory = Bukkit.getServer().createInventory(null, dataInput.readInt())
+            val decodedBytes: ByteArray = Base64.getDecoder().decode(serialized)
 
-            // Read the serialized inventory
-            for (i in 0..<inventory.size) {
-                inventory.setItem(i, dataInput.readObject() as ItemStack?)
+            ByteArrayInputStream(decodedBytes).use { inputStream ->
+                BukkitObjectInputStream(inputStream).use { objectInputStream ->
+                    return objectInputStream.readObject() as ItemStack
+                }
             }
-
-            dataInput.close()
-            return inventory
+        } catch (e: IOException) {
+            e.printStackTrace()
         } catch (e: ClassNotFoundException) {
-            throw IOException("Unable to decode class type.", e)
+            e.printStackTrace()
+        }
+
+        return null
+    }
+
+
+    /**
+     * Serializes an ArrayList to Base64 string
+     * @param list The ArrayList to serialize
+     * @return Base64 encoded string or null if serialization fails
+     */
+    @JvmStatic
+    fun serializeArrayList(list: ArrayList<*>?): String? {
+        if (list == null) return null
+        
+        try {
+            ByteArrayOutputStream().use { io ->
+                BukkitObjectOutputStream(io).use { os ->
+                    os.writeObject(list)
+                    os.flush()
+                    
+                    val serializedObject: ByteArray = io.toByteArray()
+                    return Base64.getEncoder().encodeToString(serializedObject)
+                }
+            }
+        } catch (e: IOException) {
+            e.printStackTrace()
+            return null
         }
     }
 
     /**
-     * A method to serialize an [ItemStack] array to Base64 String.
-     *
-     *
-     *
-     *
-     *
-     *
-     * Based off of [.inventoryToBase64]
-     *
-     * @param items to turn into a Base64 String.
-     * @return Base64 string of the items.
-     * @throws IllegalStateException
+     * Deserializes an ArrayList from Base64 string
+     * @param serialized The Base64 encoded string
+     * @return Deserialized ArrayList or null if deserialization fails
      */
-    @Throws(IllegalStateException::class)
-    fun itemStackArrayToBase64(items: Array<ItemStack?>): String {
+    @JvmStatic
+    fun deserializeArrayList(serialized: String?): ArrayList<*>? {
+        if (serialized == null || serialized.isEmpty()) return null
+        
         try {
-            val outputStream = ByteArrayOutputStream()
-            val dataOutput = BukkitObjectOutputStream(outputStream)
-
-            // Write the size of the inventory
-            dataOutput.writeInt(items.size)
-
-            // Save every element in the list
-            for (i in items.indices) {
-                dataOutput.writeObject(items[i])
+            val decodedBytes: ByteArray = Base64.getDecoder().decode(serialized)
+            
+            ByteArrayInputStream(decodedBytes).use { inputStream ->
+                BukkitObjectInputStream(inputStream).use { objectInputStream ->
+                    return objectInputStream.readObject() as ArrayList<*>
+                }
             }
-
-            // Serialize that array
-            dataOutput.close()
-            return Base64Coder.encodeLines(outputStream.toByteArray())
-        } catch (e: Exception) {
-            throw IllegalStateException("Unable to save item stacks.", e)
-        }
-    }
-
-    /**
-     * Gets an array of ItemStacks from Base64 string.
-     *
-     *
-     *
-     *
-     *
-     *
-     * Base off of [.inventoryFromBase64].
-     *
-     * @param data Base64 string to convert to ItemStack array.
-     * @return ItemStack array created from the Base64 string.
-     * @throws IOException
-     */
-    @Throws(IOException::class)
-    fun itemStackArrayFromBase64(data: String): Array<ItemStack?> {
-        try {
-            val inputStream = ByteArrayInputStream(Base64Coder.decodeLines(data))
-            val dataInput = BukkitObjectInputStream(inputStream)
-            val items = arrayOfNulls<ItemStack>(dataInput.readInt())
-
-            // Read the serialized inventory
-            for (i in items.indices) {
-                items[i] = dataInput.readObject() as ItemStack?
-            }
-
-            dataInput.close()
-            return items
+        } catch (e: IOException) {
+            e.printStackTrace()
         } catch (e: ClassNotFoundException) {
-            throw IOException("Unable to decode class type.", e)
+            e.printStackTrace()
         }
+        
+        return null
+    }
+
+    /**
+     * Serializes a MutableList to Base64 string
+     * @param list The MutableList to serialize
+     * @return Base64 encoded string or null if serialization fails
+     */
+    @JvmStatic
+    fun serializeMutableList(list: MutableList<*>?): String? {
+        if (list == null) return null
+        
+        try {
+            ByteArrayOutputStream().use { io ->
+                BukkitObjectOutputStream(io).use { os ->
+                    os.writeObject(list)
+                    os.flush()
+                    
+                    val serializedObject: ByteArray = io.toByteArray()
+                    return Base64.getEncoder().encodeToString(serializedObject)
+                }
+            }
+        } catch (e: IOException) {
+            e.printStackTrace()
+            return null
+        }
+    }
+
+    /**
+     * Deserializes a MutableList from Base64 string
+     * @param serialized The Base64 encoded string
+     * @return Deserialized MutableList or null if deserialization fails
+     */
+    @JvmStatic
+    fun deserializeMutableList(serialized: String?): MutableList<*>? {
+        if (serialized == null || serialized.isEmpty()) return null
+        
+        try {
+            val decodedBytes: ByteArray = Base64.getDecoder().decode(serialized)
+            
+            ByteArrayInputStream(decodedBytes).use { inputStream ->
+                BukkitObjectInputStream(inputStream).use { objectInputStream ->
+                    return objectInputStream.readObject() as MutableList<*>
+                }
+            }
+        } catch (e: IOException) {
+            e.printStackTrace()
+        } catch (e: ClassNotFoundException) {
+            e.printStackTrace()
+        }
+        
+        return null
+    }
+
+    /**
+     * Generic method to serialize any Collection to Base64 string
+     * @param collection The Collection to serialize
+     * @return Base64 encoded string or null if serialization fails
+     */
+    @JvmStatic
+    fun serializeCollection(collection: Collection<*>?): String? {
+        if (collection == null) return null
+        
+        try {
+            ByteArrayOutputStream().use { io ->
+                BukkitObjectOutputStream(io).use { os ->
+                    os.writeObject(collection)
+                    os.flush()
+                    
+                    val serializedObject: ByteArray = io.toByteArray()
+                    return Base64.getEncoder().encodeToString(serializedObject)
+                }
+            }
+        } catch (e: IOException) {
+            e.printStackTrace()
+            return null
+        }
+    }
+
+    /**
+     * Generic method to deserialize any Collection from Base64 string
+     * @param serialized The Base64 encoded string
+     * @return Deserialized Collection or null if deserialization fails
+     */
+    @JvmStatic
+    fun deserializeCollection(serialized: String?): Collection<*>? {
+        if (serialized == null || serialized.isEmpty()) return null
+        
+        try {
+            val decodedBytes: ByteArray = Base64.getDecoder().decode(serialized)
+            
+            ByteArrayInputStream(decodedBytes).use { inputStream ->
+                BukkitObjectInputStream(inputStream).use { objectInputStream ->
+                    return objectInputStream.readObject() as Collection<*>
+                }
+            }
+        } catch (e: IOException) {
+            e.printStackTrace()
+        } catch (e: ClassNotFoundException) {
+            e.printStackTrace()
+        }
+        
+        return null
     }
 }

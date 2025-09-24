@@ -5,6 +5,7 @@ import co.aikar.commands.annotation.*
 import co.aikar.commands.bukkit.contexts.OnlinePlayer
 import me.jordanfails.ascendduels.AscendDuels
 import me.jordanfails.ascendduels.arena.Arena
+import me.jordanfails.ascendduels.arena.ArenaSchematic
 import me.jordanfails.ascendduels.kit.Kit
 import me.jordanfails.ascendduels.kit.KitTag
 import me.jordanfails.ascendduels.match.Match
@@ -186,7 +187,7 @@ class DuelCommand : BaseCommand() {
         }
 
         val match = AscendDuels.instance.matchService
-            .newPlayerMatch(request.kit, request.arena, sender, receiver)
+            .newPlayerMatch(request.kit, null, sender, receiver)
         if (match == null) {
             sender.sendMessage(AscendDuels.prefix("&cNo arena is available."))
             receiver.sendMessage(AscendDuels.prefix("&cNo arena is available."))
@@ -219,7 +220,7 @@ class DuelCommand : BaseCommand() {
         }
 
         val match = AscendDuels.instance.matchService
-            .newRiskMatch(request.kit, request.arena, sender, receiver)
+            .newRiskMatch(request.kit, null, sender, receiver)
         if (match == null) {
             sender.sendMessage(AscendDuels.prefix("&cNo arena available."))
             receiver.sendMessage(AscendDuels.prefix("&cNo arena available."))
@@ -255,19 +256,19 @@ class DuelCommand : BaseCommand() {
     private fun arenaSelectMenu(player: Player, target: Player, kit: Kit) {
         val menu: Menu = PaginatedMenu("Select an Arena", 3, 7).apply {
             fillSides(Button.PLACEHOLDER)
-            AscendDuels.instance.arenaService.all()
-                .filter { it.isComplete }
+            AscendDuels.instance.arenaHandler.getSchematics()
+                .filter { it.isEnabledSafe }
                 .sortedBy { it.name }
-                .forEach { arena ->
+                .forEach { schematic ->
                     addButton(Button(
-                        ItemBuilder(arena.displayItem!!)
-                            .name("${ChatColor.DARK_RED}${arena.displayName}")
+                        ItemBuilder(Material.GRASS)
+                            .name("${ChatColor.DARK_RED}${schematic.name}")
                             .lore("", "&aClick to select this arena.")
                             .flag(ItemFlag.HIDE_ENCHANTS)
                             .flag(ItemFlag.HIDE_POTION_EFFECTS)
                             .flag(ItemFlag.HIDE_ATTRIBUTES)
                             .flag(ItemFlag.HIDE_UNBREAKABLE),
-                        { player2, _ -> duelRequest(player2, target, kit, arena) }
+                        { player2, _ -> duelRequest(player2, target, kit, schematic) }
                     ))
                 }
             buildInventory()
@@ -275,7 +276,7 @@ class DuelCommand : BaseCommand() {
         }
     }
 
-    private fun duelRequest(sender: Player, receiver: Player, kit: Kit, arena: Arena) {
+    private fun duelRequest(sender: Player, receiver: Player, kit: Kit, schematic: ArenaSchematic) {
         sender.closeInventory()
         val requestService = AscendDuels.instance.requestService
 
@@ -284,11 +285,11 @@ class DuelCommand : BaseCommand() {
             return
         }
 
-        val request = requestService.createRequest(sender.uniqueId, receiver.uniqueId, kit, arena)
+        val request = requestService.createRequest(sender.uniqueId, receiver.uniqueId, kit, schematic)
         sender.sendMessage("")
         sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6&lDuel Request Sent"))
         sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6┃ &fTo: &e${receiver.displayName}"))
-        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6┃ &fInfo: &e${kit.displayName} - ${arena.displayName}"))
+        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6┃ &fInfo: &e${kit.displayName} - ${schematic.name}"))
         sender.sendMessage("")
         sender.spigot().sendMessage(*cancelMessage(request.id).create())
         sender.sendMessage("")
@@ -296,7 +297,7 @@ class DuelCommand : BaseCommand() {
         receiver.sendMessage("")
         receiver.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6&lDuel Request"))
         receiver.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6┃ &fFrom: &e${sender.displayName}"))
-        receiver.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6┃ &fInfo: &e${kit.displayName} - ${arena.displayName}"))
+        receiver.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6┃ &fInfo: &e${kit.displayName} - ${schematic.name}"))
         receiver.sendMessage("")
         receiver.spigot().sendMessage(*acceptOrDenyMessage(request.id).create())
         receiver.sendMessage("")

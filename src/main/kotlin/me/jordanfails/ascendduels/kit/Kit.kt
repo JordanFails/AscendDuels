@@ -3,6 +3,7 @@ package me.jordanfails.ascendduels.kit
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.reflect.TypeToken
+import me.jordanfails.ascendduels.AscendDuels
 import me.jordanfails.ascendduels.api.serializable.JsonSerializable
 import me.jordanfails.ascendduels.api.serializable.builder.JsonObjectBuilder
 import net.pvpwars.core.Core
@@ -62,26 +63,36 @@ class Kit() : JsonSerializable {
             .jsonObject
     }
 
-    override fun deserialize(json: JsonObject?) {
-        if (json == null) return
+    override fun deserialize(jsonObject: JsonObject?) {
+        if (jsonObject == null) return
         val gson: Gson = Core.getInstance().gson
 
-        name = json["name"].asString
-        disabled = json["disabled"].asBoolean
-        _displayName = json["displayName"].asString
+        name = jsonObject["name"].asString
+        disabled = jsonObject["disabled"].asBoolean
+        _displayName = jsonObject["displayName"].asString
 
-        val displayItemStr = json["displayItem"].asString
+        val displayItemStr = jsonObject["displayItem"].asString
         if (displayItemStr.isNotEmpty()) {
-            _displayItem = SerializationUtil.itemStackFromBase64(displayItemStr)
+            try {
+                _displayItem = SerializationUtil.itemStackFromBase64(displayItemStr)
+            } catch (e: Exception) {
+                AscendDuels.instance.logger.warning("Failed to deserialize display item for kit '${name}': ${e.message}")
+                _displayItem = null
+            }
         }
 
         inventory = KitInventory().apply {
-            deserialize(json["inventory"].asString)
+            try {
+                deserialize(jsonObject["inventory"].asString)
+            } catch (e: Exception) {
+                AscendDuels.instance.logger.warning("Failed to deserialize inventory for kit '${name}': ${e.message}")
+                // Keep the empty inventory
+            }
         }
 
-        tags = if (json.has("tags")) {
+        tags = if (jsonObject.has("tags")) {
             gson.fromJson(
-                json["tags"].asJsonArray,
+                jsonObject["tags"].asJsonArray,
                 object : TypeToken<Set<KitTag>>() {}.type
             )
         } else {
@@ -91,5 +102,16 @@ class Kit() : JsonSerializable {
 
     companion object {
         val EMPTY: Kit = Kit().apply { inventory = KitInventory() }
+
+        val DEFAULT: Kit = Kit().apply {
+            name = "Default"
+            setDisplayName("&aDefault Kit")
+            tags = mutableSetOf(KitTag.NORMAL)
+            setDisplayItem(ItemStack(Material.DIAMOND_SWORD))
+            inventory = KitInventory(
+                arrayOf(ItemStack(Material.DIAMOND_SWORD), ItemStack(Material.GOLDEN_APPLE, 5)),
+                arrayOf(ItemStack(Material.DIAMOND_HELMET), ItemStack(Material.DIAMOND_CHESTPLATE), ItemStack(Material.DIAMOND_LEGGINGS), ItemStack(Material.IRON_BOOTS))
+            )
+        }
     }
 }

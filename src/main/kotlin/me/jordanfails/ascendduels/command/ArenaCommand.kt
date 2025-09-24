@@ -2,246 +2,182 @@ package me.jordanfails.ascendduels.command
 
 import co.aikar.commands.BaseCommand
 import co.aikar.commands.annotation.*
+import com.massivecraft.factions.util.CC
 import me.jordanfails.ascendduels.AscendDuels
 import me.jordanfails.ascendduels.arena.Arena
-import me.jordanfails.ascendduels.arena.ArenaService
-import me.jordanfails.ascendduels.arena.ArenaTag
-import me.jordanfails.ascendduels.utils.SchematicUtil
-import net.pvpwars.core.util.isAir
-import net.pvpwars.core.util.item.ItemBuilder
-import org.bukkit.Bukkit
-import org.bukkit.Location
-import org.bukkit.World
-import org.bukkit.command.CommandSender
+import me.jordanfails.ascendduels.arena.ArenaGrid
+import me.jordanfails.ascendduels.arena.ArenaSchematic
+import me.jordanfails.ascendduels.utils.LocationUtils
+import org.apache.commons.lang.StringUtils
+import org.bukkit.ChatColor
 import org.bukkit.entity.Player
-import org.bukkit.scheduler.BukkitRunnable
-import java.util.concurrent.ConcurrentLinkedQueue
+import java.io.File
 
 @CommandAlias("arena")
-@CommandPermission("command.AscendDuels.admin")
+@Description("Manage PotPvP arenas")
+@CommandPermission("potpvp.arena.admin")
 class ArenaCommand : BaseCommand() {
 
-    private val arenaService: ArenaService = AscendDuels.instance.arenaService
+    companion object {
+//        private val HELP_MESSAGE = arrayOf(
+//            "${ChatColor.DARK_PURPLE}${PotPvPLang.LONG_LINE}",
+//            "§5§lArena Commands",
+//            "${ChatColor.DARK_PURPLE}${PotPvPLang.LONG_LINE}",
+//            "§c ${PotPvPLang.LEFT_ARROW_NAKED} §a/arena free",
+//            "§c ${PotPvPLang.LEFT_ARROW_NAKED} §a/arena createSchematic <schematic>",
+//            "§c ${PotPvPLang.LEFT_ARROW_NAKED} §a/arena listArenas <schematic>",
+//            "§c ${PotPvPLang.LEFT_ARROW_NAKED} §a/arena repasteSchematic <schematic>",
+//            "§c ${PotPvPLang.LEFT_ARROW_NAKED} §a/arena rescaleall",
+//            "§c ${PotPvPLang.LEFT_ARROW_NAKED} §a/arena listSchematics",
+//            "${ChatColor.DARK_PURPLE}${this.LONG_LINE}"
+//        )
 
-    @Default
-    fun onCommand(sender: CommandSender) {
-        sender.sendMessage("/arena <subcommand>")
+        val LONG_LINE: String = "${ChatColor.STRIKETHROUGH}${StringUtils.repeat("-", 53)}"
     }
 
-    @Subcommand("list")
-    fun onList(sender: CommandSender) {
-        sender.sendMessage(AscendDuels.prefix("&fArena List:"))
-        for (arena in arenaService.all()) {
-            sender.sendMessage("")
-            sender.sendMessage("name: ${arena.name}")
-            sender.sendMessage("displayName: ${arena.displayName}")
-            sender.sendMessage("schematic: ${arena.schematicName}")
-            sender.sendMessage(
-                "tags: " + arena.tags.joinToString(", ") { it.name }
-            )
-        }
+//    @Default
+//    fun onHelp(player: Player) {
+//        player.sendMessage(HELP_MESSAGE)
+//    }
+
+    @Subcommand("free")
+    @Description("Free arena grid")
+    fun arenaFree(player: Player) {
+        AscendDuels.instance.arenaHandler.grid.free()
+        player.sendMessage("${ChatColor.GREEN}Arena grid has been freed.")
     }
 
-    @Subcommand("create")
-    fun onCreate(sender: CommandSender, @Name("name") name: String) {
-        var arena = arenaService.get(name)
-        if (arena == null) {
-            arena = Arena(name)
-            arenaService.add(arena)
-            arenaService.saveAll()
-            sender.sendMessage(AscendDuels.prefix("&aSuccessfully created the arena: $name"))
+    @Subcommand("createSchematic")
+    @Syntax("<schematic>")
+    @Description("Create and load arena schematic")
+    fun arenaCreateSchematic(player: Player, schematicName: String) {
+        val arenaHandler = AscendDuels.instance.arenaHandler
 
-            if (!arena.isComplete) {
-                sender.sendMessage(AscendDuels.prefix("&6The arena wasn't saved as it's not completed yet!"))
-                sender.sendMessage(AscendDuels.prefix("&6Next Recommended: &f/arena displayName $name <displayName>"))
-            } else {
-                sender.sendMessage(AscendDuels.prefix("&aThe arena was saved!"))
-            }
-        } else {
-            sender.sendMessage(AscendDuels.prefix("&cAn arena with this name already exists!"))
-        }
-    }
-
-    @Subcommand("delete")
-    @CommandCompletion("@arenas")
-    fun onDelete(sender: CommandSender, @Name("arena") arena: Arena) {
-        arenaService.remove(arena.name!!)
-        arenaService.saveAll()
-        sender.sendMessage(AscendDuels.prefix("&aSuccessfully deleted the arena: ${arena.name}"))
-    }
-
-    @Subcommand("displayName")
-    @CommandCompletion("@arenas")
-    fun onDisplayName(sender: CommandSender, @Name("arena") arena: Arena, @Name("name") displayName: String) {
-        arena.displayName = displayName
-        arena.displayItem?.let {
-            arena.displayItem = ItemBuilder(it).name(arena.displayName!!)
-        }
-        arenaService.saveAll()
-
-        sender.sendMessage(AscendDuels.prefix("&aUpdated display name for arena: ${arena.name}"))
-        if (!arena.isComplete) {
-            sender.sendMessage(AscendDuels.prefix("&6The arena wasn't saved as it's not completed yet!"))
-            sender.sendMessage(
-                AscendDuels.prefix("&6Next Recommended: &f/arena displayItem ${arena.name}")
-            )
-        } else {
-            sender.sendMessage(AscendDuels.prefix("&aThe arena was saved!"))
-        }
-    }
-
-    @Subcommand("displayItem")
-    @CommandCompletion("@arenas")
-    fun onDisplayItem(@Flags("itemheld") player: Player, arena: Arena) {
-        arena.displayItem = player.inventory.itemInHand
-        if(player.inventory.itemInHand == null || player.inventory.itemInHand.type.isAir()) {
-            player.sendMessage(AscendDuels.prefix("&cYou must be holding an item to set as the display item!"))
+        if (arenaHandler.getSchematic(schematicName) != null) {
+            player.sendMessage("${ChatColor.RED}Schematic $schematicName already exists")
             return
         }
-        arena.displayName?.let {
-            arena.displayItem = ItemBuilder(arena.displayItem!!).name(it)
+
+        val schematic = ArenaSchematic(schematicName)
+        val schemFile: File = schematic.getSchematicFile()
+
+        if (!schemFile.exists()) {
+            player.sendMessage("${ChatColor.RED}No file for $schematicName found. (${schemFile.path})")
+            return
         }
-        arenaService.saveAll()
 
-        player.sendMessage(AscendDuels.prefix("&aUpdated display item for arena: ${arena.name}"))
-        if (!arena.isComplete) {
-            player.sendMessage(AscendDuels.prefix("&6The arena wasn't saved as it's not completed yet!"))
-            player.sendMessage(
-                AscendDuels.prefix("&6Next Recommended: &f/arena tag ${arena.name} <arenaTag>")
-            )
-        } else {
-            player.sendMessage(AscendDuels.prefix("&aThe arena was saved!"))
-        }
-    }
+        arenaHandler.registerSchematic(schematic)
 
-    @Subcommand("tag")
-    @CommandCompletion("@arenas @arenaTags")
-    fun onTag(sender: CommandSender, arena: Arena, arenaTag: ArenaTag) {
-        if (!arena.tags.add(arenaTag)) {
-            arena.tags.remove(arenaTag)
-        }
-        arenaService.saveAll()
-
-        sender.sendMessage(AscendDuels.prefix("&aUpdated tags for arena: ${arena.name}"))
-        sender.sendMessage(
-            AscendDuels.prefix("&aNew tags: " + arena.tags.joinToString(", ") { it.name })
-        )
-
-        if (!arena.isComplete) {
-            sender.sendMessage(AscendDuels.prefix("&6The arena wasn't saved as it's not completed yet!"))
-            sender.sendMessage(
-                AscendDuels.prefix("&6Next Recommended: &f/arena schematic ${arena.name} <schemName>")
-            )
-        } else {
-            sender.sendMessage(AscendDuels.prefix("&aThe arena was saved!"))
-        }
-    }
-
-    @Subcommand("schematic")
-    @CommandCompletion("@arenas")
-    fun onSchematic(player: Player, arena: Arena, schemName: String) {
-        val schemLocation: Location
         try {
-            schemLocation = SchematicUtil.save(player, schemName)
-        } catch (t: Throwable) {
-            t.printStackTrace()
-            player.sendMessage(AscendDuels.prefix("&cAn error occurred while saving schematic!"))
+            schematic.pasteModelArena()
+            arenaHandler.saveSchematics()
+        } catch (ex: Exception) {
+            throw RuntimeException(ex)
+        }
+
+        player.sendMessage("${ChatColor.GREEN}Schematic created.")
+    }
+
+    @Subcommand("listArenas")
+    @Syntax("<schematic>")
+    @Description("List arenas of a schematic")
+    fun arenaListArenas(player: Player, schematicName: String) {
+        val arenaHandler = AscendDuels.instance.arenaHandler
+        val schematic = arenaHandler.getSchematic(schematicName)
+
+        if (schematic == null) {
+            player.sendMessage("${ChatColor.RED}Schematic $schematicName not found.")
+            player.sendMessage("${ChatColor.RED}List all schematics with /arena listSchematics")
             return
         }
 
-        arena.schematicName = schemName
-        arena.schematicLoc = schemLocation
-        arenaService.saveAll()
+        player.sendMessage("${ChatColor.RED}------ ${ChatColor.WHITE}${schematic.name} Arenas ${ChatColor.RED}------")
 
-        player.sendMessage(AscendDuels.prefix("&aUpdated schematic for arena: ${arena.name}"))
-        if (!arena.isComplete) {
-            player.sendMessage(AscendDuels.prefix("&6The arena wasn't saved as it's not completed yet!"))
-            player.sendMessage(
-                AscendDuels.prefix("&6Next Recommended: &f/arena spawnPoint ${arena.name} <number>")
-            )
-        } else {
-            player.sendMessage(AscendDuels.prefix("&aThe arena was saved!"))
+        for (arena: Arena in arenaHandler.getArenas(schematic)) {
+            val locationStr = LocationUtils.locToStr(arena.getSpectatorSpawnLocation())
+            val occupiedStr =
+                if (arena.inUse) "${ChatColor.RED}In Use" else "${ChatColor.GREEN}Open"
+
+            player.sendMessage("${arena.copy}: ${ChatColor.GREEN}$locationStr ${ChatColor.GRAY}- $occupiedStr")
         }
     }
 
-    @Subcommand("spawnPoint")
-    @CommandCompletion("@arenas")
-    fun onSpawnPoint(player: Player, arena: Arena, number: Int) {
-        if (arena.schematicLoc == null) {
-            player.sendMessage(AscendDuels.prefix("&cThe schematic must be set first!"))
+    @Subcommand("repasteSchematic")
+    @Syntax("<schematic>")
+    @Description("Repaste schematic arenas")
+    fun arenaRepasteSchematic(player: Player, schematicName: String) {
+        val arenaHandler = AscendDuels.instance.arenaHandler
+        val schematic = arenaHandler.getSchematic(schematicName)
+
+        if (schematic == null) {
+            player.sendMessage("${ChatColor.RED}Schematic $schematicName not found.")
+            player.sendMessage("${ChatColor.RED}List all schematics with /arena listSchematics")
             return
         }
 
-        val schemLoc = arena.schematicLoc!!
-        val relativeLoc = player.location.clone().subtract(schemLoc)
-
-        val spawnPoints = arena.spawnPoints
-        if (spawnPoints.size > number) {
-            player.sendMessage(AscendDuels.prefix("&cThe maximum number you can put is: ${spawnPoints.size}"))
+        val currentCopies = arenaHandler.countArenas(schematic)
+        if (currentCopies == 0) {
+            player.sendMessage("${ChatColor.RED}No copies of ${schematic.name} exist.")
             return
         }
 
-        spawnPoints.add(number - 1, relativeLoc)
-        arenaService.saveAll()
+        val grid: ArenaGrid = arenaHandler.grid
+        player.sendMessage("${ChatColor.GREEN}Starting...")
 
-        player.sendMessage(AscendDuels.prefix("&aUpdated spawn point for arena: ${arena.name}"))
-        if (!arena.isComplete) {
-            player.sendMessage(AscendDuels.prefix("&6The arena wasn't saved as it's not completed yet!"))
-            player.sendMessage(
-                AscendDuels.prefix("&6Next Recommended: &f/arena displayName ${arena.name} <displayName>")
-            )
-        } else {
-            player.sendMessage(AscendDuels.prefix("&aThe arena was saved!"))
-        }
-    }
+        grid.scaleCopies(schematic, 0) {
+            player.sendMessage("${ChatColor.GREEN}Removed old maps, creating new copies...")
 
-    @Subcommand("testPaste")
-    @CommandCompletion("@arenas")
-    fun onTestPaste(player: Player, arena: Arena) {
-        val loaded = arenaService.get(arena.name!!) ?: return
-        SchematicUtil.paste(loaded.schematicName!!, player.location)
-    }
-
-    @Subcommand("tpSpawnPoint")
-    @CommandCompletion("@arenas @spawnPointTypes")
-    fun onTpSpawnPoint(player: Player, arena: Arena, number: Int) {
-        val loaded = arenaService.get(arena.name!!) ?: return
-        val relativeSpawnPoint = loaded.spawnPoints[number - 1]
-        val schemLoc = loaded.schematicLoc!!
-        val spawnPoint = schemLoc.clone().add(relativeSpawnPoint)
-        spawnPoint.yaw = relativeSpawnPoint.yaw
-        spawnPoint.pitch = relativeSpawnPoint.pitch
-
-        player.teleport(spawnPoint)
-    }
-
-    @Subcommand("generateArenas")
-    @CommandCompletion("@worlds")
-    fun onGenerateArenas(sender: CommandSender, worldName: String) {
-        val world: World = Bukkit.getWorld(worldName)
-            ?: return sender.sendMessage(AscendDuels.prefix("&cWorld not found: $worldName"))
-
-        val arenas = arenaService.all()
-        sender.sendMessage(AscendDuels.prefix("Generating arenas"))
-
-        val taskQueue = ConcurrentLinkedQueue<Runnable>()
-        arenas.forEachIndexed { index, arena ->
-            arena.genArenas.clear()
-            taskQueue.addAll(arena.getGenerateTasks(world, index))
-        }
-
-        object : BukkitRunnable() {
-            override fun run() {
-                val task = taskQueue.poll()
-                if (task != null) {
-                    task.run()
-                    sender.sendMessage("Completed generate task (${taskQueue.size} left)")
-                } else {
-                    cancel()
-                    arenaService.saveAll()
-                    sender.sendMessage(AscendDuels.prefix("&aGeneration complete!"))
-                }
+            grid.scaleCopies(schematic, currentCopies) {
+                player.sendMessage("${ChatColor.GREEN}Repasted $currentCopies arenas using the newest ${schematic.name} schematic.")
             }
-        }.runTaskTimer(AscendDuels.instance, 20L, 20L)
+        }
+    }
+
+    @Subcommand("scale")
+    @Syntax("<schematic> <count>")
+    @Description("Scale a schematic to specific number of arenas")
+    fun arenaScale(player: Player, schematicName: String, count: Int) {
+        val arenaHandler = AscendDuels.instance.arenaHandler
+        val schematic = arenaHandler.getSchematic(schematicName)
+
+        if (schematic == null) {
+            player.sendMessage("${ChatColor.RED}Schematic $schematicName not found.")
+            player.sendMessage("${ChatColor.RED}List all schematics with /arena listSchematics")
+            return
+        }
+
+        player.sendMessage("${ChatColor.GREEN}Starting...")
+
+        arenaHandler.grid.scaleCopies(schematic, count) {
+            player.sendMessage("${ChatColor.GREEN}Scaled ${schematic.name} to $count copies.")
+        }
+    }
+
+    @Subcommand("rescaleall")
+    @Description("Rescale all schematics")
+    fun arenaRescaleAll(player: Player) {
+        val handler = AscendDuels.instance.arenaHandler
+
+        handler.schematics.values.forEach { schematic ->
+            val totalCopies = handler.getArenas(schematic).size
+            arenaScale(player, schematic.name!!, 0)
+            arenaScale(player, schematic.name!!, totalCopies)
+            player.sendMessage("${ChatColor.GREEN}Rescaling ${schematic.name}...")
+        }
+    }
+
+    @Subcommand("listSchematics")
+    @CommandAlias("listSchems")
+    @Description("List all schematics")
+    fun arenaListSchems(player: Player) {
+        val handler = AscendDuels.instance.arenaHandler
+        player.sendMessage(LONG_LINE)
+        player.sendMessage(CC.translate("&5&lPotPvP Schematics"))
+        player.sendMessage(LONG_LINE)
+        handler.schematics.values.forEach { schematic ->
+            val size = handler.getArenas(schematic).size
+            player.sendMessage(CC.translate("&c${schematic.name} &7| &cArenas using: &f$size"))
+        }
+        player.sendMessage(LONG_LINE)
     }
 }

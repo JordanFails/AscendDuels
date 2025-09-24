@@ -1,7 +1,7 @@
 package me.jordanfails.ascendduels.request
 
 import me.jordanfails.ascendduels.api.service.Service
-import me.jordanfails.ascendduels.arena.Arena
+import me.jordanfails.ascendduels.arena.ArenaSchematic
 import me.jordanfails.ascendduels.kit.Kit
 import net.pvpwars.core.util.runnable.RunnableBuilder
 import java.util.*
@@ -22,7 +22,7 @@ class RequestService : Service {
         }
     }
 
-    fun createRequest(sender: UUID?, receiver: UUID?, kit: Kit?, arena: Arena?): Request {
+    fun createRequest(sender: UUID?, receiver: UUID?, kit: Kit?, arena: ArenaSchematic?): Request {
         val request = Request(UUID.randomUUID(), sender, receiver, kit, arena)
 
         byRequestID[request.id] = request

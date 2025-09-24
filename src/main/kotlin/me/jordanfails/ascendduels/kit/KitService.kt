@@ -34,9 +34,7 @@ class KitService : Service {
     fun saveKits() = storage.saveKits()
 
     override fun load() {
-        val commandManager: PaperCommandManager = Core.getInstance()
-            .commandManager
-            .commandManager
+        val commandManager: PaperCommandManager = AscendDuels.instance.commandHandler
 
         // Context resolver for Kit arguments
         commandManager.commandContexts.registerContext(Kit::class.java) { context ->

@@ -1,130 +1,150 @@
 package me.jordanfails.ascendduels.arena
 
-import com.google.gson.Gson
-import com.google.gson.JsonObject
-import com.google.gson.reflect.TypeToken
-import me.jordanfails.ascendduels.api.serializable.JsonSerializable
-import me.jordanfails.ascendduels.api.serializable.builder.JsonObjectBuilder
-import net.pvpwars.core.Core
-import net.pvpwars.core.util.location.LocUtil
-import me.jordanfails.ascendduels.utils.SchematicUtil
-import net.pvpwars.duels.util.SerializationUtil
-import org.bukkit.Location
-import org.bukkit.World
-import org.bukkit.inventory.ItemStack
+import com.google.common.base.Preconditions
+import me.jordanfails.ascendduels.AscendDuels
+import me.jordanfails.ascendduels.utils.AngleUtils
+import me.jordanfails.ascendduels.utils.Cuboid
+import org.bukkit.*
+import org.bukkit.block.Block
+import org.bukkit.block.BlockFace
+import org.bukkit.block.Skull
+import java.util.*
+import kotlin.math.abs
 
-class Arena() : JsonSerializable {
+/**
+ * Represents a pasted instance of an [ArenaSchematic].
+ */
+class Arena(
+    val schematic: String?,
+    val copy: Int,
+    val bounds: Cuboid?
+) {
 
-    var name: String? = null
-    var displayName: String? = null
-    var displayItem: ItemStack? = null
-    var schematicName: String? = null
-    var schematicLoc: Location? = null
-    var tags: MutableSet<ArenaTag> = HashSet()
-    var spawnPoints: MutableList<Location> = ArrayList()
-    var genArenas: MutableList<GenArena> = ArrayList()
+    var team1Spawn: Location? = null
+    var team2Spawn: Location? = null
+    var spectatorSpawn: Location? = null
+    var eventSpawns: MutableList<Location>? = null
 
-    constructor(name: String) : this() {
-        this.name = name
-        this.tags = HashSet()
-        this.spawnPoints = ArrayList()
-        this.genArenas = ArrayList()
+    @get:JvmName("isInUse")
+    internal var inUse: Boolean = false
+
+    /** No-arg constructor for Gson */
+    constructor() : this(null, 0, null)
+
+    /**
+     * Call this after pasting a schematic world edit to initialize spawn markers.
+     */
+    fun initializeSpawns() {
+        if (bounds != null) {
+            Preconditions.checkNotNull(bounds, "Bounds must not be null before scanning")
+        }
+        scanLocations()
     }
 
-    val isComplete: Boolean
-        get() = name != null &&
-                displayName != null &&
-                schematicName != null &&
-                displayItem != null &&
-                schematicLoc != null &&
-                tags.isNotEmpty() &&
-                spawnPoints.isNotEmpty()
+    fun getSpectatorSpawnLocation(): Location {
+        if (spectatorSpawn != null) {
+            return spectatorSpawn!!
+        }
+        val xDiff = abs(team1Spawn!!.blockX - team2Spawn!!.blockX)
+        val yDiff = abs(team1Spawn!!.blockY - team2Spawn!!.blockY)
+        val zDiff = abs(team1Spawn!!.blockZ - team2Spawn!!.blockZ)
 
-    fun hasTag(arenaTag: ArenaTag): Boolean = tags.contains(arenaTag)
+        val newX = minOf(team1Spawn!!.blockX, team2Spawn!!.blockX) + (xDiff / 2)
+        val newY = minOf(team1Spawn!!.blockY, team2Spawn!!.blockY) + (yDiff / 2)
+        val newZ = minOf(team1Spawn!!.blockZ, team2Spawn!!.blockZ) + (zDiff / 2)
 
-    fun getGenerateTasks(world: World, generateIndex: Int): List<Runnable> {
-        val tasks = mutableListOf<Runnable>()
-        val distance = 300
-        val x = generateIndex * distance
+        val arenaHandler = AscendDuels.instance.arenaHandler
+        spectatorSpawn = Location(arenaHandler.getArenaWorld(), newX.toDouble(), newY.toDouble(), newZ.toDouble())
 
-        for (z in 0 until distance * 2 step distance) {
-            tasks.add(Runnable {
-                val pasteLoc = Location(world, x.toDouble(), 100.0, z.toDouble())
-                schematicName?.let {
-                    SchematicUtil.paste(it, pasteLoc)
+        while (spectatorSpawn!!.block.type.isSolid) {
+            spectatorSpawn!!.add(0.0, 1.0, 0.0)
+        }
+        return spectatorSpawn!!
+    }
+
+    private fun scanLocations() {
+        forEachBlock { block ->
+            if (block.type != Material.SKULL) return@forEachBlock
+
+            val skull = block.state as Skull
+            val below = block.getRelative(BlockFace.DOWN)
+
+            val skullLocation =
+                block.location.clone().add(0.5, 1.5, 0.5).apply {
+                    yaw = AngleUtils.faceToYaw(skull.rotation) + 90f
                 }
-                genArenas.add(GenArena(pasteLoc, false))
-            })
+
+            when (skull.skullType) {
+                SkullType.SKELETON -> {
+                    spectatorSpawn = skullLocation
+                    block.type = Material.AIR
+                    if (below.type == Material.FENCE) below.type = Material.AIR
+                }
+                SkullType.PLAYER -> {
+                    if (team1Spawn == null) {
+                        team1Spawn = skullLocation
+                    } else {
+                        team2Spawn = skullLocation
+                    }
+                    block.type = Material.AIR
+                    if (below.type == Material.FENCE) below.type = Material.AIR
+                }
+                SkullType.CREEPER -> {
+                    block.type = Material.AIR
+                    if (below.type == Material.FENCE) below.type = Material.AIR
+                    if (eventSpawns == null) eventSpawns = mutableListOf()
+                    if (!eventSpawns!!.contains(skullLocation)) {
+                        eventSpawns!!.add(skullLocation)
+                    }
+                }
+                else -> {}
+            }
         }
-        return tasks
+
+        Preconditions.checkNotNull(team1Spawn, "Team 1 spawn (player skull) cannot be null.")
+        Preconditions.checkNotNull(team2Spawn, "Team 2 spawn (player skull) cannot be null.")
     }
 
-    fun unoccupiedGenArena(): GenArena? =
-        genArenas.firstOrNull { !it.occupied }
+    private fun forEachBlock(callback: (Block) -> Unit) {
+        val start = bounds!!.getLowerNE()
+        val end = bounds.getUpperSW()
+        val world = bounds.getWorld()
 
-    fun getSpawnLocation(arena: GenArena, spawnPointIndex: Int): Location {
-        val spawnPoint = spawnPoints[spawnPointIndex]
-        return arena.location.clone().add(spawnPoint.toVector()).apply {
-            yaw = spawnPoint.yaw
-            pitch = spawnPoint.pitch
+        for (x in start.blockX until end.blockX) {
+            for (y in start.blockY until end.blockY) {
+                for (z in start.blockZ until end.blockZ) {
+                    callback(world.getBlockAt(x, y, z))
+                }
+            }
         }
     }
 
-    override fun serialize(): JsonObject {
-        val gson: Gson = Core.getInstance().gson
-        return JsonObjectBuilder()
-            .addProperty("name", name)
-            .addProperty("displayName", displayName)
-            .addProperty("displayItem", SerializationUtil.itemStackToBase64(displayItem))
-            .addProperty("schematicName", schematicName)
-            .addProperty("schematicLoc", LocUtil.serializeLocation(schematicLoc))
-            .addProperty("tags", gson.toJsonTree(tags))
-            .addProperty(
-                "spawnPoints",
-                gson.toJsonTree(spawnPoints.map { LocUtil.serializeLocation(it) })
-            )
-            .addProperty(
-                "genArenas",
-                gson.toJsonTree(genArenas.map { it.serialize() })
-            )
-            .jsonObject
+    private fun forEachChunk(callback: (Chunk) -> Unit) {
+        val lowerX = bounds!!.getLowerX() shr 4
+        val lowerZ = bounds.getLowerZ() shr 4
+        val upperX = bounds.getUpperX() shr 4
+        val upperZ = bounds.getUpperZ() shr 4
+        val world = bounds.getWorld()
+
+        for (x in lowerX..upperX) {
+            for (z in lowerZ..upperZ) {
+                callback(world.getChunkAt(x, z))
+            }
+        }
     }
 
-    override fun deserialize(jsonObject: JsonObject?) {
-        val gson: Gson = Core.getInstance().gson
+    override fun equals(other: Any?): Boolean {
+        if (other !is Arena) return false
+        return other.schematic == schematic && other.copy == copy
+    }
 
-        if (jsonObject == null) return
+    override fun hashCode(): Int {
+        return Objects.hash(schematic, copy)
+    }
 
-        name = jsonObject["name"].asString
-        displayName = jsonObject["displayName"].asString
-
-        val itemStr = jsonObject["displayItem"].asString
-        if (itemStr.isNotEmpty()) {
-            displayItem = SerializationUtil.itemStackFromBase64(itemStr)
-        }
-
-        schematicName = jsonObject["schematicName"].asString
-        schematicLoc = LocUtil.deserializeLocation(jsonObject["schematicLoc"].asString)
-
-        tags = gson.fromJson(
-            jsonObject["tags"].asJsonArray,
-            object : TypeToken<Set<ArenaTag>>() {}.type
-        )
-
-        val points: List<String> = gson.fromJson(
-            jsonObject["spawnPoints"].asJsonArray,
-            object : TypeToken<List<String>>() {}.type
-        )
-        spawnPoints = points.map { LocUtil.deserializeLocation(it) }.toMutableList()
-
-        genArenas = try {
-            val generated: List<JsonObject> = gson.fromJson(
-                jsonObject["genArenas"].asJsonArray,
-                object : TypeToken<List<JsonObject>>() {}.type
-            )
-            generated.map { GenArena(it) }.toMutableList()
-        } catch (_: NullPointerException) {
-            ArrayList()
-        }
+    fun getSpawnLocation(index: Int): Location = when (index) {
+        0 -> team1Spawn!!
+        1 -> team2Spawn!!
+        else -> throw IllegalArgumentException("Invalid spawn index: $index")
     }
 }

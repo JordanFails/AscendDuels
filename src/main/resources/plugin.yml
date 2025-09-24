@@ -1,4 +1,6 @@
 name: "AscendDuels"
 version: "1.0.0-SNAPSHOT"
-authors: "JordanFails"
+authors:
+  - "JordanFails"
 main: "me.jordanfails.ascendduels.AscendDuels"
+depend: [ PWCore, WorldEdit ]

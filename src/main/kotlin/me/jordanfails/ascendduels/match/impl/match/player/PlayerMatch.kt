@@ -1,5 +1,6 @@
 package me.jordanfails.ascendduels.match.impl.match.player
 
+import io.papermc.lib.PaperLib
 import me.jordanfails.ascendduels.AscendDuels
 import me.jordanfails.ascendduels.match.Match
 import me.jordanfails.ascendduels.match.MatchStatistics
@@ -14,7 +15,6 @@ import net.pvpwars.core.Core
 import net.pvpwars.core.util.StringUtil
 import net.pvpwars.core.util.runnable.RunnableBuilder
 import me.jordanfails.ascendduels.arena.Arena
-import me.jordanfails.ascendduels.arena.GenArena
 import me.jordanfails.ascendduels.kit.KitTag
 import me.jordanfails.ascendduels.match.MatchState
 import me.jordanfails.ascendduels.kit.Kit
@@ -33,10 +33,9 @@ import java.util.*
 open class PlayerMatch(
     kit: Kit,
     arena: Arena,
-    genArena: GenArena,
     playerOne: Player,
     playerTwo: Player
-) : Match<Player, PlayerParticipant>(kit, arena, genArena) {
+) : Match<Player, PlayerParticipant>(kit, arena) {
 
     private val players: List<Player> = listOf(playerOne, playerTwo)
     private val participants: List<PlayerParticipant> =
@@ -58,8 +57,27 @@ open class PlayerMatch(
     protected open fun prepare(player: Player, index: Int) {
         player.closeInventory()
 
-        val spawnPoint = arena.getSpawnLocation(genArena, index)
-        // PaperLib async teleport is commented — could be added back if targeting newer Paper versions.
+        val spawnPoint = arena.getSpawnLocation(index)
+        PaperLib.getChunkAtAsync(spawnPoint).thenAccept { _ ->
+            player.foodLevel = 20
+            player.health = player.maxHealth
+            player.fireTicks = 0
+            player.gameMode = GameMode.SURVIVAL
+            player.fallDistance = 0f
+            player.allowFlight = false
+            player.isFlying = false
+            player.setMetadata("ignoreSector", FixedMetadataValue(AscendDuels.instance, true))
+
+            player.activePotionEffects.forEach { effect: PotionEffect ->
+                player.removePotionEffect(effect.type)
+            }
+
+            player.closeInventory()
+            player.teleport(spawnPoint)
+
+            kit.inventory!!.load(player)
+            player.saturation = 10f
+        }
     }
 
     override fun onEnd(instant: Boolean) {
@@ -103,7 +121,7 @@ open class PlayerMatch(
 
     protected fun yeetAndClean() {
         consumePlayers { player ->
-            if (player.isOnline && player.world == genArena.location.world) {
+            if (player.isOnline && player.world == arena.bounds!!.getWorld()) {
                 for (effect in player.activePotionEffects) {
                     player.removePotionEffect(effect.type)
                 }
@@ -125,7 +143,7 @@ open class PlayerMatch(
         entitiesToClear.filter(Entity::isValid).forEach(Entity::remove)
         entitiesToClear.clear()
 
-        genArena.occupied = false
+        arena.inUse = false
         AscendDuels.instance.matchService.unregisterMatch(this)
     }
 
@@ -164,10 +182,11 @@ open class PlayerMatch(
         )
 
         builder.event(HoverEvent(HoverEvent.Action.SHOW_TEXT, hoverComponent))
+        val stringUUID = player.uniqueId.toString()
         builder.event(
             ClickEvent(
                 ClickEvent.Action.RUN_COMMAND,
-                "/duelinventory ${player.uniqueId}"
+                "/duelinventory $stringUUID"
             )
         )
     }
