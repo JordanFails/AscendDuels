@@ -10,16 +10,21 @@ import me.jordanfails.ascendduels.arena.ArenaHandler
 import me.jordanfails.ascendduels.command.*
 import me.jordanfails.ascendduels.inventory.MatchInventoryService
 import me.jordanfails.ascendduels.inventory.PlayerInventoryService
+import me.jordanfails.ascendduels.inventory.PlayerInventoryManager
 import me.jordanfails.ascendduels.inventory.RiskPostMatchInventoryService
 import me.jordanfails.ascendduels.kit.KitService
 import me.jordanfails.ascendduels.listener.PlayerListener
 import me.jordanfails.ascendduels.listener.RiskMatchConfirmListener
 import me.jordanfails.ascendduels.listener.TeleportListener
+import me.jordanfails.ascendduels.listener.v2.DuelEventListener
 import me.jordanfails.ascendduels.match.MatchService
+import me.jordanfails.ascendduels.match.v2.MatchManagerV2
 import me.jordanfails.ascendduels.request.RequestService
 import me.jordanfails.ascendduels.spy.DuelSpyService
 import me.jordanfails.ascendduels.utils.KillcamManager
 import me.jordanfails.ascendduels.utils.WorldUtil
+import me.jordanfails.ascendduels.utils.menu.ButtonListeners
+import me.jordanfails.ascendduels.utils.menu.MenuAutoUpdater
 import me.jordanfails.ascendduels.utils.serialization.VectorAdapter
 import net.pvpwars.core.util.CC
 import net.pvpwars.core.util.StringUtil
@@ -55,8 +60,10 @@ class AscendDuels : JavaPlugin() {
     lateinit var kitService: KitService
     lateinit var arenaHandler: ArenaHandler
     lateinit var matchService: MatchService
+    lateinit var matchManagerV2: MatchManagerV2
     lateinit var matchInventoryService: MatchInventoryService
     lateinit var playerInventoryService: PlayerInventoryService
+    lateinit var playerInventoryManager: PlayerInventoryManager
     lateinit var riskPostMatchInventoryService: RiskPostMatchInventoryService
     lateinit var requestService: RequestService
     lateinit var duelSpyService: DuelSpyService
@@ -88,16 +95,20 @@ class AscendDuels : JavaPlugin() {
         kitService = KitService()
         arenaHandler = ArenaHandler()
         matchService = MatchService()
+        matchManagerV2 = MatchManagerV2()
         matchInventoryService = MatchInventoryService()
         playerInventoryService = PlayerInventoryService()
+        playerInventoryManager = PlayerInventoryManager()
         riskPostMatchInventoryService = RiskPostMatchInventoryService()
         requestService = RequestService()
         duelSpyService = DuelSpyService()
         services = mutableListOf(
             kitService,
-            matchService,
+            // matchService, // Disabled - using matchManagerV2 instead
+            matchManagerV2,
             matchInventoryService,
             playerInventoryService,
+            playerInventoryManager,
             riskPostMatchInventoryService,
             requestService,
             duelSpyService
@@ -144,9 +155,15 @@ class AscendDuels : JavaPlugin() {
 
     private fun registerListeners() {
         val pluginManager: PluginManager = server.pluginManager
-        pluginManager.registerEvents(PlayerListener(), this)
-        pluginManager.registerEvents(TeleportListener(), this)
+        // pluginManager.registerEvents(PlayerListener(), this) // Disabled - using DuelEventListener instead
+        pluginManager.registerEvents(DuelEventListener(), this)
         pluginManager.registerEvents(RiskMatchConfirmListener(), this)
         pluginManager.registerEvents(KillcamManager, this)
+        pluginManager.registerEvents(ButtonListeners, this)
+        pluginManager.registerEvents(MenuAutoUpdater, this)
+        server.scheduler.runTaskTimerAsynchronously(this, {
+            MenuAutoUpdater.run()
+        }, 2L, 2L)
+//        Tasks.asyncTimer(MenuAutoUpdater, 2L, 2L)
     }
 }

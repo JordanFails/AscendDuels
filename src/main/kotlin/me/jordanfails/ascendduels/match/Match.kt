@@ -26,7 +26,7 @@ abstract class Match<T, P : MatchParticipant<T>>(
     var state: MatchState? = null
         private set
 
-    var secondsTilStart: Int = 6
+    var secondsTilStart: Int = 5
     var secondsTilTimeout: Int = 3600
 
     val entitiesToClear: MutableSet<Entity> = HashSet()
@@ -47,17 +47,25 @@ abstract class Match<T, P : MatchParticipant<T>>(
 
     fun tick() {
         if (state == MatchState.STARTING) {
-            if (--secondsTilStart > 0) {
+            if (secondsTilStart > 0) {
                 sendMessage(
                     AscendDuels.prefix(
                         "The match will begin in {0} second{1}...",
                         secondsTilStart, if (secondsTilStart == 1) "" else "s"
                     )
                 )
+                sendTitle(
+                    "&a&lMatch Starting",
+                    "&fStarting in &a${secondsTilStart}&e second${if (secondsTilStart == 1) "" else "s"}"
+                )
                 playSound(Sound.NOTE_PLING, 1.0f, 1.0f)
+                secondsTilStart--
             } else {
                 setState(MatchState.ONGOING)
-
+                sendTitle(
+                    "&a&lMatch Started!",
+                    "&fGood luck, have fun!"
+                )
                 sendMessage(AscendDuels.prefix("The match has now started!"))
                 playSound(Sound.NOTE_PLING, 3.0f, 2.0f)
 
@@ -129,6 +137,15 @@ abstract class Match<T, P : MatchParticipant<T>>(
 
     fun sendMessage(message: String, vararg arguments: Any) {
         sendMessage(StringUtil.format(message, *arguments))
+    }
+
+    fun sendTitle(title: String, subtitle: String = "") {
+        consumePlayers { player ->
+            player.sendTitle(
+                StringUtil.color(title),
+                StringUtil.color(subtitle),
+            )
+        }
     }
 
     fun playSound(sound: Sound, volume: Float, pitch: Float) {

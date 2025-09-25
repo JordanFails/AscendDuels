@@ -1,7 +1,5 @@
 package me.jordanfails.ascendduels.kit
 
-import com.google.gson.JsonObject
-import com.google.gson.JsonParser
 import com.rit.sucy.enchanting.EEquip
 import de.tr7zw.changeme.nbtapi.NBTItem
 import me.jordanfails.ascendduels.AscendDuels
@@ -15,7 +13,7 @@ class KitInventory : JsonInventory {
 
     constructor(contents: Array<ItemStack?>, armorContents: Array<ItemStack?>)
             : super(contents, armorContents)
-    
+
     /**
      * Safely adds NBT tags to an ItemStack
      * @param item The ItemStack to add tags to
@@ -29,7 +27,9 @@ class KitInventory : JsonInventory {
             nbtItem.setBoolean(tagName, value)
             nbtItem.item
         } catch (e: Exception) {
-            AscendDuels.instance.logger.warning("Failed to set NBT tag '$tagName' on item ${item.type}: ${e.message}")
+            AscendDuels.instance.logger.warning(
+                "Failed to set NBT tag '$tagName' on item ${item.type}: ${e.message}"
+            )
             item // Return original item if NBT fails
         }
     }
@@ -37,7 +37,6 @@ class KitInventory : JsonInventory {
     fun load(player: Player) = load(player, ignoreContents = false)
 
     fun load(player: Player, ignoreContents: Boolean = false) {
-        // Reset XP and effects
         player.exp = 0.0f
         player.totalExperience = 0
         player.level = 0
@@ -45,30 +44,43 @@ class KitInventory : JsonInventory {
             player.removePotionEffect(effect.type)
         }
 
-        // Mark duel items in storage arrays safely
-        if(contents.isNotEmpty()) {
+        if (contents.isNotEmpty()) {
+            // Ensure duelItem NBT tags are applied
             contents = contents.map { item ->
-                if (item != null && item.type != null) {
-                    addNBTTag(item, "duelItem", true)
-                } else null
+                val safeItem = item ?: return@map null
+                addNBTTag(safeItem, "duelItem", true)
             }.toTypedArray()
+
+            // --- NEW LOGIC: Check item count ---
+            val nonNullItems = contents.filterNotNull()
+            if (nonNullItems.isEmpty()) {
+                // No items at all → log warning (or could give a default)
+                AscendDuels.instance.logger.warning(
+                    "KitInventory for ${player.name} had no valid items in contents!"
+                )
+            } else if (nonNullItems.size > 1) {
+                // More than one item → mark them with a custom tag as multiple
+                contents = contents.map { item ->
+                    val safeItem = item ?: return@map null
+                    addNBTTag(safeItem, "hasMultiple", true)
+                }.toTypedArray()
+            }
         }
 
-        if(armorContents.isNotEmpty()) {
+        if (armorContents.isNotEmpty()) {
             armorContents = armorContents.map { item ->
-                if (item != null && item.type != null) {
-                    addNBTTag(item, "duelItem", true)
-                } else null
+                if (item == null) return@map null
+                item.amount = 1
+                addNBTTag(item, "duelItem", true)
             }.toTypedArray()
         }
 
         if (!ignoreContents) {
             player.inventory.contents = contents
             player.inventory.armorContents = armorContents
-            player.updateInventory() // acceptable if needed on Paper
+            player.updateInventory()
         }
 
-        // Run EEquip (will ensure correct armor equip handling)
         EEquip(player).runTaskLater(AscendDuels.instance, 1L)
     }
 }

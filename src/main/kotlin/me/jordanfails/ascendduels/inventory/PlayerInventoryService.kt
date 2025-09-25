@@ -19,13 +19,18 @@ class PlayerInventoryService : Service {
         val armorContents = player.inventory.armorContents.clone()
         
         savedInventories[player.uniqueId] = JsonInventory(contents, armorContents)
+        player.sendMessage("§7[DEBUG] Inventory saved with ${contents.filterNotNull().size} items")
     }
     
     /**
      * Restores a player's saved inventory when returning to spawn
      */
     fun restoreInventory(player: Player): Boolean {
-        val savedInventory = savedInventories.remove(player.uniqueId) ?: return false
+        val savedInventory = savedInventories.remove(player.uniqueId)
+        if (savedInventory == null) {
+            player.sendMessage("§c[DEBUG] No saved inventory found for ${player.name}")
+            return false
+        }
         
         // Clear current inventory first
         player.inventory.clear()
@@ -36,6 +41,7 @@ class PlayerInventoryService : Service {
         player.inventory.armorContents = savedInventory.armorContents
         player.updateInventory()
         
+        player.sendMessage("§a[DEBUG] Inventory restored with ${savedInventory.contents.filterNotNull().size} items")
         return true
     }
     

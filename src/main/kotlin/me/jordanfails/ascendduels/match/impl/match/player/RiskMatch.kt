@@ -140,18 +140,7 @@ class RiskMatch(
 
     override fun onDeath(player: Player, reason: DeathReason) {
         handlePlayerDeath(player)
-
-        if (state != MatchState.ENDED) {
-            loser = findParticipant(player)
-            winner = getOpponent(player)
-
-            loser?.let { l ->
-                val craftPlayer = l.get() as CraftPlayer
-                craftPlayer.saveData() // snapshot data persistence
-            }
-
-            end()
-        }
+        // Match ending is now handled in handlePlayerDeath after spectator period
     }
 
     private fun handlePlayerDeath(player: Player) {
@@ -163,23 +152,7 @@ class RiskMatch(
 
         val world = player.world
 
-        fun dropInvItems(items: Array<ItemStack?>) {
-            for (itemStack in items) {
-                if (itemStack != null && itemStack.type != Material.AIR) {
-                    val itemEntity: Item =
-                        world.dropItemNaturally(player.location, itemStack)
-                    itemEntity.pickupDelay = 120
-                    itemEntity.setMetadata(
-                        "SKIP_CLEANUP",
-                        FixedMetadataValue(AscendDuels.instance, true)
-                    )
-                    entitiesToClear.add(itemEntity)
-                }
-            }
-        }
-
-        dropInvItems(player.inventory.contents)
-        dropInvItems(player.inventory.armorContents)
+        // Items are no longer dropped on death - they are handled in match ending process
 
         player.foodLevel = 20
         player.saturation = 5f
@@ -187,18 +160,44 @@ class RiskMatch(
         player.fireTicks = 0
 
         player.noDamageTicks = 60
-        player.inventory.clear()
-        player.inventory.armorContents = null
-        player.updateInventory()
+        
+        // Don't clear inventory here - it will be handled in match ending process
 
         player.velocity = Vector(player.velocity.x, 3.0, player.velocity.z)
 
         player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, 19, 0))
         world.playSound(player.location, Sound.IRONGOLEM_DEATH, 1.0f, 1.0f)
 
-        player.allowFlight = true
-        player.isFlying = true
-        player.flySpeed = player.flySpeed
+        // Put player in spectator mode for 5 seconds
+        player.gameMode = GameMode.SPECTATOR
+        player.sendMessage("§7You are now spectating...")
+        
+        // Handle inventory for the dead player immediately
+        val isWinner = false // The dead player is never the winner
+        AscendDuels.instance.playerInventoryManager.handleMatchEnd(player, true, isWinner)
+        
+        // Schedule match end after 5 seconds of spectating
+        RunnableBuilder.forPlugin(AscendDuels.instance)
+            .with { 
+                if (state != MatchState.ENDED) {
+                    loser = findParticipant(player)
+                    winner = getOpponent(player)
+                    
+                    loser?.let { l ->
+                        val craftPlayer = l.get() as CraftPlayer
+                        craftPlayer.saveData() // snapshot data persistence
+                    }
+                    
+                    // Handle inventory for the winner when match ends
+                    winner?.let { winnerParticipant ->
+                        val winnerPlayer = winnerParticipant.get()
+                        AscendDuels.instance.playerInventoryManager.handleMatchEnd(winnerPlayer, true, true)
+                    }
+                    
+                    end()
+                }
+            }
+            .runSyncLater(100L) // 5 seconds (20 ticks per second)
 
         RunnableBuilder.forPlugin(AscendDuels.instance)
             .with {

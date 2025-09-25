@@ -1,9 +1,9 @@
 package me.jordanfails.ascendduels.command.menu
 
+import me.jordanfails.ascendduels.utils.menu.Button
+import me.jordanfails.ascendduels.utils.menu.Menu
+import me.jordanfails.ascendduels.utils.menu.buttons.GlassButton
 import net.atlantismc.menus.item.ItemBuilder
-import net.atlantismc.menus.menu.Menu
-import net.atlantismc.menus.menu.button.Button
-import net.atlantismc.menus.menu.button.impl.GlassButton
 import net.pvpwars.core.util.CC
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -15,7 +15,7 @@ class DuelsMenu: Menu() {
         for (i in 0 until 10) {
             if (i == 4) continue
             buttons[i] = object : Button() {
-                override fun getItem(player: Player): ItemStack {
+                override fun getButtonItem(player: Player): ItemStack {
                     return ItemBuilder(Material.STAINED_GLASS_PANE)
                         .data(7)
                         .name(CC.translate(" &7"))
@@ -23,11 +23,11 @@ class DuelsMenu: Menu() {
                 }
             }
 
-            buttons[i] = GlassButton()
+            buttons[i] = GlassButton(7)
         }
 
         buttons[4] = object : Button() {
-            override fun getItem(player: Player): ItemStack {
+            override fun getButtonItem(player: Player): ItemStack {
                 return ItemBuilder(Material.STAINED_GLASS_PANE)
                     .data(0)
                     .name(CC.translate("&c&lDuel Queue"))
@@ -55,8 +55,8 @@ class DuelsMenu: Menu() {
             }
         }
 
-        buttons[13] = object : Button() {
-            override fun getItem(player: Player): ItemStack {
+        buttons[12] = object : Button() {
+            override fun getButtonItem(player: Player): ItemStack {
                 return ItemBuilder(Material.IRON_SWORD)
                     .name("&b&lUnranked Queue")
                     .lore(
@@ -75,8 +75,8 @@ class DuelsMenu: Menu() {
 
         }
 
-        buttons[15] = object : Button() {
-            override fun getItem(player: Player): ItemStack {
+        buttons[13] = object : Button() {
+            override fun getButtonItem(player: Player): ItemStack {
                 return ItemBuilder(Material.DIAMOND_SWORD)
                     .name("&c&lRanked Queue")
                     .lore(
@@ -94,20 +94,19 @@ class DuelsMenu: Menu() {
                             )
                         )
                     ).build()
+
             }
         }
 
         for (i in 18 until 26) {
             buttons[i] = object : Button() {
-                override fun getItem(player: Player): ItemStack {
+                override fun getButtonItem(player: Player): ItemStack {
                     return ItemBuilder(Material.STAINED_GLASS_PANE)
                         .data(7)
                         .name(CC.translate(" &7"))
                         .build()
                 }
             }
-
-            buttons[i] = GlassButton()
         }
         return buttons;
     }

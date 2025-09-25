@@ -3,8 +3,8 @@ package me.jordanfails.ascendduels.inventory
 import com.google.common.collect.Lists
 import com.rit.sucy.service.ERomanNumeral
 import me.jordanfails.ascendduels.match.MatchStatistics
-import net.atlantismc.menus.menu.Menu
-import net.atlantismc.menus.menu.button.Button
+import me.jordanfails.ascendduels.utils.menu.Button
+import me.jordanfails.ascendduels.utils.menu.Menu
 import net.pvpwars.core.util.item.ItemBuilder
 import org.apache.commons.lang.time.DurationFormatUtils
 import org.apache.commons.lang3.text.WordUtils
@@ -49,7 +49,7 @@ class MatchInventory(
 
         // PvP Info (slot 48)
         buttons[48] = object : Button() {
-            override fun getItem(player: Player): ItemStack {
+            override fun getButtonItem(player: Player): ItemStack {
                 return ItemBuilder(Material.DIAMOND_SWORD)
                     .name("&b&lPvP Info")
                     .lore(
@@ -77,7 +77,7 @@ class MatchInventory(
                                 statistics.healsUsed) * 100.0
                     else 0.0
                 buttons[49] = object : Button() {
-                    override fun getItem(player: Player): ItemStack {
+                    override fun getButtonItem(player: Player): ItemStack {
                         return ItemBuilder(
                             Potion.fromDamage(16421)
                                 .toItemStack(maxOf(statistics.healsRemaining, 1))
@@ -100,7 +100,7 @@ class MatchInventory(
 
             MatchStatistics.HealType.SOUP -> {
                 buttons[49] = object : Button() {
-                    override fun getItem(player: Player): ItemStack {
+                    override fun getButtonItem(player: Player): ItemStack {
                         return ItemBuilder(Material.MUSHROOM_SOUP)
                             .amount(maxOf(statistics.healsRemaining, 1))
                             .name("&b&lHeal Info")
@@ -143,7 +143,7 @@ class MatchInventory(
         effectsLore.add(" ")
 
         buttons[50] = object : Button() {
-            override fun getItem(player: Player): ItemStack {
+            override fun getButtonItem(player: Player): ItemStack {
                 return ItemBuilder(Material.SKULL_ITEM, SkullType.PLAYER.ordinal.toByte())
                     .owner(statsPlayer.name)
                     .name("&b&lPlayer Info")
@@ -166,7 +166,9 @@ class MatchInventory(
 
     private fun simpleButton(stack: ItemStack?): Button {
         return object : Button() {
-            override fun getItem(player: Player) = stack ?: ItemStack(0)
+            override fun getButtonItem(player: Player): ItemStack {
+                return ItemStack(0)
+            }
         }
     }
 }

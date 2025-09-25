@@ -107,7 +107,7 @@ class TeleportListener : Listener {
             }
         }
         
-        private fun clearDuelItems(player: Player) {
+        fun clearDuelItems(player: Player) {
             // Clear main inventory of duel items
             for (i in 0 until player.inventory.size) {
                 val item = player.inventory.getItem(i)

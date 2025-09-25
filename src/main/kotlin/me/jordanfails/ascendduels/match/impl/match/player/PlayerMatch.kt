@@ -5,6 +5,8 @@ import me.jordanfails.ascendduels.AscendDuels
 import me.jordanfails.ascendduels.match.Match
 import me.jordanfails.ascendduels.match.MatchStatistics
 import me.jordanfails.ascendduels.match.impl.participant.PlayerParticipant
+import me.jordanfails.ascendduels.match.impl.match.player.RiskMatch
+import me.jordanfails.ascendduels.listener.TeleportListener
 import net.md_5.bungee.api.ChatColor
 import net.md_5.bungee.api.chat.BaseComponent
 import net.md_5.bungee.api.chat.ClickEvent
@@ -50,6 +52,10 @@ open class PlayerMatch(
         val p1 = getParticipant(0)
         val p2 = getParticipant(1)
 
+        // Save player states before match starts
+        AscendDuels.instance.playerInventoryManager.savePlayerState(p1.get())
+        AscendDuels.instance.playerInventoryManager.savePlayerState(p2.get())
+
         prepare(p1.get(), 0)
         prepare(p2.get(), 1)
     }
@@ -75,6 +81,8 @@ open class PlayerMatch(
             player.closeInventory()
             player.teleport(spawnPoint)
 
+            // Prepare inventory for duel
+            AscendDuels.instance.playerInventoryManager.prepareDuelInventory(player, this is RiskMatch)
             kit.inventory!!.load(player)
             player.saturation = 10f
         }
@@ -136,6 +144,10 @@ open class PlayerMatch(
                 player.fallDistance = 0f
                 player.gameMode = GameMode.SURVIVAL
                 player.velocity = Vector()
+                
+                // Only clear any remaining duel items - inventory restoration handled at death
+                TeleportListener.clearDuelItems(player)
+                
                 player.teleport(Core.getInstance().locationFile.spawn)
             }
         }
@@ -193,12 +205,7 @@ open class PlayerMatch(
 
     override fun onDeath(player: Player, reason: DeathReason) {
         handlePlayerDeath(player)
-
-        if (state != MatchState.ENDED) {
-            loser = findParticipant(player)
-            winner = getOpponent(player)
-            end()
-        }
+        // Match ending is now handled in handlePlayerDeath after spectator period
     }
 
     private fun handlePlayerDeath(player: Player) {
@@ -206,22 +213,7 @@ open class PlayerMatch(
 
         val world = player.world
 
-        fun dropInvItems(items: Array<ItemStack?>) {
-            for (itemStack in items) {
-                if (itemStack != null && itemStack.type != Material.AIR) {
-                    val itemEntity: Item = world.dropItemNaturally(player.location, itemStack)
-                    itemEntity.pickupDelay = 120
-                    itemEntity.setMetadata(
-                        "SKIP_CLEANUP",
-                        FixedMetadataValue(AscendDuels.instance, true)
-                    )
-                    entitiesToClear.add(itemEntity)
-                }
-            }
-        }
-
-        dropInvItems(player.inventory.contents)
-        dropInvItems(player.inventory.armorContents)
+        // Items are no longer dropped on death - they are handled in match ending process
 
         player.foodLevel = 20
         player.saturation = 5f
@@ -229,18 +221,38 @@ open class PlayerMatch(
         player.fireTicks = 0
         player.noDamageTicks = 60
 
-        player.inventory.clear()
-        player.inventory.armorContents = null
-        player.updateInventory()
+        // Don't clear inventory here - it will be handled in match ending process
 
         player.velocity = Vector(player.velocity.x, 3.0, player.velocity.z)
 
         player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, 19, 0))
         world.playSound(player.location, Sound.IRONGOLEM_DEATH, 1.0f, 1.0f)
 
-        player.allowFlight = true
-        player.isFlying = true
-        player.flySpeed = player.flySpeed
+        // Put player in spectator mode for 5 seconds
+        player.gameMode = GameMode.SPECTATOR
+        player.sendMessage("§7You are now spectating...")
+        
+        // Handle inventory for the dead player immediately
+        val isWinner = false // The dead player is never the winner
+        AscendDuels.instance.playerInventoryManager.handleMatchEnd(player, this is RiskMatch, isWinner)
+        
+        // Schedule match end after 5 seconds of spectating
+        RunnableBuilder.forPlugin(AscendDuels.instance)
+            .with { 
+                if (state != MatchState.ENDED) {
+                    loser = findParticipant(player)
+                    winner = getOpponent(player)
+                    
+                    // Handle inventory for the winner when match ends
+                    winner?.let { winnerParticipant ->
+                        val winnerPlayer = winnerParticipant.get()
+                        AscendDuels.instance.playerInventoryManager.handleMatchEnd(winnerPlayer, this is RiskMatch, true)
+                    }
+                    
+                    end()
+                }
+            }
+            .runSyncLater(100L) // 5 seconds (20 ticks per second)
     }
 
     override fun canHurt(damager: Player, entity: Player): Boolean = true

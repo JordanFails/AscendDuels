@@ -33,13 +33,14 @@ import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import co.aikar.commands.annotation.Optional
 import me.jordanfails.ascendduels.command.menu.DuelsMenu
+import net.pvpwars.core.util.CC
 
 @CommandAlias("duel")
 class DuelCommand : BaseCommand() {
 
     companion object {
         var DISABLED: Boolean = false
-        val matchService = AscendDuels.instance.matchService
+        val matchManager = AscendDuels.instance.matchManagerV2
     }
 
     @Default
@@ -55,7 +56,7 @@ class DuelCommand : BaseCommand() {
         }
 
         if(target == null) {
-            DuelsMenu().open(sender)
+            DuelsMenu().openMenu(sender)
             return
         }
 
@@ -64,7 +65,7 @@ class DuelCommand : BaseCommand() {
             return
         }
 
-        if(matchService.getByUuid(target.player.uniqueId)!= null) {
+        if(matchManager.isInMatch(target.player)) {
             sender.sendMessage(AscendDuels.prefix("&cThat player is already in a duel."))
             return
         }
@@ -163,9 +164,12 @@ class DuelCommand : BaseCommand() {
 
     @Subcommand("leave")
     fun onLeave(player: Player) {
-        AscendDuels.instance.matchService.getByPlayer(player)?.let { match ->
-            match.onDeath(player, Match.DeathReason.QUIT)
-            match.sendMessage(AscendDuels.prefix("&c${player.displayName} &fhas quit!"))
+        val match = matchManager.getMatch(player)
+        if (match != null) {
+            match.onPlayerDeath(player) // Treat leaving as death
+            player.sendMessage(AscendDuels.prefix("&fYou have left the duel."))
+        } else {
+            player.sendMessage(AscendDuels.prefix("&cYou are not in a duel."))
         }
     }
 
@@ -173,8 +177,8 @@ class DuelCommand : BaseCommand() {
         return isInCombat(sender) || isInCombat(receiver) ||
                 !sender.isOnline || !receiver.isOnline ||
                 sender.isDead || receiver.isDead ||
-                AscendDuels.instance.matchService.getByPlayer(sender) != null ||
-                AscendDuels.instance.matchService.getByPlayer(receiver) != null
+                matchManager.isInMatch(sender) ||
+                matchManager.isInMatch(receiver)
     }
 
     private fun startPlayerMatch(request: Request, sender: Player, receiver: Player) {
@@ -186,11 +190,18 @@ class DuelCommand : BaseCommand() {
             return
         }
 
-        val match = AscendDuels.instance.matchService
-            .newPlayerMatch(request.kit, null, sender, receiver)
-        if (match == null) {
+        // Find an available arena
+        val arena = AscendDuels.instance.arenaHandler.allocateUnusedArena { true }.orElse(null)
+        if (arena == null) {
             sender.sendMessage(AscendDuels.prefix("&cNo arena is available."))
             receiver.sendMessage(AscendDuels.prefix("&cNo arena is available."))
+            return
+        }
+
+        val match = matchManager.createMatch(request.kit!!, arena, sender, receiver)
+        if (match == null) {
+            sender.sendMessage(AscendDuels.prefix("&cUnable to create match."))
+            receiver.sendMessage(AscendDuels.prefix("&cUnable to create match."))
             return
         }
         match.start()
@@ -219,11 +230,18 @@ class DuelCommand : BaseCommand() {
             return
         }
 
-        val match = AscendDuels.instance.matchService
-            .newRiskMatch(request.kit, null, sender, receiver)
-        if (match == null) {
+        // Find an available arena
+        val arena = AscendDuels.instance.arenaHandler.allocateUnusedArena { true }.orElse(null)
+        if (arena == null) {
             sender.sendMessage(AscendDuels.prefix("&cNo arena available."))
             receiver.sendMessage(AscendDuels.prefix("&cNo arena available."))
+            return
+        }
+
+        val match = matchManager.createRiskMatch(request.kit!!, arena, sender, receiver)
+        if (match == null) {
+            sender.sendMessage(AscendDuels.prefix("&cUnable to create risk match."))
+            receiver.sendMessage(AscendDuels.prefix("&cUnable to create risk match."))
             return
         }
         match.start()
@@ -241,6 +259,7 @@ class DuelCommand : BaseCommand() {
                 .forEach { kit ->
                     addButton(Button(
                         ItemBuilder(kit.displayItem)
+                            .name(CC.translate(kit.displayName))
                             .lore("", "&7Click to select this kit.", "")
                             .flag(ItemFlag.HIDE_ENCHANTS)
                             .flag(ItemFlag.HIDE_POTION_EFFECTS)
@@ -278,6 +297,13 @@ class DuelCommand : BaseCommand() {
 
     private fun duelRequest(sender: Player, receiver: Player, kit: Kit, schematic: ArenaSchematic) {
         sender.closeInventory()
+        
+        // Validate kit has items
+        if (!validateKit(kit)) {
+            sender.sendMessage(AscendDuels.prefix("&cKit '${kit.displayName}' has no items and cannot be used for duels!"))
+            return
+        }
+        
         val requestService = AscendDuels.instance.requestService
 
         if (requestService.hasExistingRequest(sender.uniqueId, receiver.uniqueId)) {
@@ -287,17 +313,17 @@ class DuelCommand : BaseCommand() {
 
         val request = requestService.createRequest(sender.uniqueId, receiver.uniqueId, kit, schematic)
         sender.sendMessage("")
-        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6&lDuel Request Sent"))
-        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6┃ &fTo: &e${receiver.displayName}"))
-        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6┃ &fInfo: &e${kit.displayName} - ${schematic.name}"))
+        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&4&lDuel Request Sent"))
+        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c┃ &fTo: &e${receiver.displayName}"))
+        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c┃ &fInfo: &e${kit.displayName} - ${schematic.name}"))
         sender.sendMessage("")
         sender.spigot().sendMessage(*cancelMessage(request.id).create())
         sender.sendMessage("")
 
         receiver.sendMessage("")
-        receiver.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6&lDuel Request"))
-        receiver.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6┃ &fFrom: &e${sender.displayName}"))
-        receiver.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6┃ &fInfo: &e${kit.displayName} - ${schematic.name}"))
+        receiver.sendMessage(ChatColor.translateAlternateColorCodes('&', "&4&lDuel Request"))
+        receiver.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c┃ &fFrom: &e${sender.displayName}"))
+        receiver.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c┃ &fInfo: &e${kit.displayName} - ${schematic.name}"))
         receiver.sendMessage("")
         receiver.spigot().sendMessage(*acceptOrDenyMessage(request.id).create())
         receiver.sendMessage("")
@@ -406,5 +432,20 @@ class DuelCommand : BaseCommand() {
 
     fun isInCombat(player: Player): Boolean {
         return CombatTagUtil.isTagged(player)
+    }
+    
+    /**
+     * Validates that a kit has at least one item (either in contents or armor)
+     */
+    private fun validateKit(kit: Kit): Boolean {
+        val kitInventory = kit.inventory ?: return false
+        
+        // Check if kit has any items in contents
+        val hasContentItems = kitInventory.contents.any { it != null }
+        
+        // Check if kit has any armor items
+        val hasArmorItems = kitInventory.armorContents.any { it != null }
+        
+        return hasContentItems || hasArmorItems
     }
 }

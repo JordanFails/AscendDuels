@@ -17,7 +17,7 @@ class KitSelectionMenu : Menu() {
         return "Select a Kit - 1/1"
     }
 
-    inner class KitButton(
+    class KitButton(
         val kit: Kit
     ): Button() {
         override fun getItem(player: Player): ItemStack {

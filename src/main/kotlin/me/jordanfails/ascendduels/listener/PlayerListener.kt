@@ -12,6 +12,7 @@ import me.jordanfails.ascendduels.match.impl.match.player.RiskMatch
 import me.jordanfails.ascendduels.utils.EventUtil
 // import me.jordanfails.ascendduels.utils.EventUtil.playDeathReplay
 import me.jordanfails.ascendduels.utils.KillcamManager
+import me.jordanfails.ascendduels.listener.TeleportListener
 import net.pvpwars.core.Core
 import net.pvpwars.core.game.features.armorsets.events.ArmorSetWearEvent
 import net.pvpwars.core.util.material.MaterialUtil
@@ -131,25 +132,7 @@ class PlayerListener : Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
-    fun onEntityDamage(event: EntityDamageEvent) {
-        val player = event.entity as? Player ?: return
-        val match = AscendDuels.instance.matchService.getByPlayer(player) ?: return
-
-        if (match.state != MatchState.ONGOING) {
-            event.isCancelled = true
-            event.damage = 0.0
-            return
-        }
-
-        if (event is EntityDamageByEntityEvent) {
-            val damager = EventUtil.linkProjectile(event.damager)
-            if (damager != null && !match.canHurt(damager, player)) {
-                event.isCancelled = true
-                event.damage = 0.0
-            }
-        }
-    }
+    // Damage handling moved to DuelEventListener for new match system
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     fun onArmorSetEquip(event: ArmorSetWearEvent) {
@@ -161,59 +144,11 @@ class PlayerListener : Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    fun onEntityDamageByEntity(event: EntityDamageByEntityEvent) {
-        val damager = EventUtil.linkProjectile(event.damager) ?: return
-        val match = AscendDuels.instance.matchService.getByPlayer(damager) ?: return
+    // Entity damage by entity handling moved to DuelEventListener for new match system
 
-        val damagerStats = match.getStatistics(damager)
-        damagerStats.hitsLanded++
-        damagerStats.currentCombo++
-        damagerStats.damageDealt += event.finalDamage.toInt()
-        if (damagerStats.currentCombo > damagerStats.longestCombo) {
-            damagerStats.longestCombo = damagerStats.currentCombo
-        }
+    // Death handling moved to DuelEventListener for new match system
 
-        if (event.entity is Player) {
-            match.getStatistics(event.entity as Player).currentCombo = 0
-        }
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    fun onEntityPreDeath(event: PlayerDeathEvent) {
-        val player = event.entity
-        val match = AscendDuels.instance.matchService.getByPlayer(player) ?: return
-
-        var killer: Player? = null
-        if (player.lastDamageCause is EntityDamageByEntityEvent) {
-            val byEntity = player.lastDamageCause as EntityDamageByEntityEvent
-            killer = EventUtil.linkProjectile(byEntity.damager)
-        }
-
-        if (killer != null) {
-            match.sendMessage(AscendDuels.prefix("&c${player.displayName} &fhas died to &c${killer.displayName}&f!"))
-        } else {
-            match.sendMessage(AscendDuels.prefix("&c${player.displayName} &fhas died!"))
-        }
-
-        match.onDeath(player, Match.DeathReason.KILLED)
-    }
-
-    @EventHandler(priority = EventPriority.LOW)
-    fun onPlayerQuit(event: PlayerQuitEvent) {
-        val player = event.player
-        val match = AscendDuels.instance.matchService.getByPlayer(player) ?: return
-        match.onDeath(player, Match.DeathReason.QUIT)
-        match.sendMessage(AscendDuels.prefix("&c${player.displayName} &fhas quit!"))
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    fun onPlayerKick(event: PlayerKickEvent) {
-        val player = event.player
-        val match = AscendDuels.instance.matchService.getByPlayer(player) ?: return
-        match.onDeath(player, Match.DeathReason.KICKED)
-        match.sendMessage(AscendDuels.prefix("&c${player.displayName} &fwas kicked!"))
-    }
+    // Quit/kick handling moved to DuelEventListener for new match system
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     fun onTeleport(event: PlayerTeleportEvent) {
@@ -225,6 +160,15 @@ class PlayerListener : Listener {
         val toWorld: World = event.to.world
 
         if (toWorld != fromWorld) {
+            // Handle pre-duel setup
+            if (arenaService.isWorld(toWorld)) {
+                // Entering an arena world
+                TeleportListener.pinInventory(player)
+                player.removeMetadata("riskMatchConfirming", AscendDuels.instance)
+            }
+            // Note: Inventory saving/restoration is now handled in match lifecycle
+
+            // Now handle cancellation logic
             if (arenaService.isWorld(toWorld)
                 && !arenaService.isWorld(fromWorld)
                 && matchService.getByPlayer(player) == null
@@ -246,7 +190,7 @@ class PlayerListener : Listener {
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     fun onCommandPreprocess(event: PlayerCommandPreprocessEvent) {
         val player = event.player
-        val match = AscendDuels.instance.matchService.getByPlayer(player) ?: return
+        if (AscendDuels.instance.matchService.getByPlayer(player) == null) return
         if (player.isOp) return
 
         val msg = event.message.lowercase()
